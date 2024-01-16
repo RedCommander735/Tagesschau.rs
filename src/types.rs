@@ -62,25 +62,44 @@ pub enum Timeframe {
     DateRange(DateRange),
 }
 
+#[derive(Clone, Copy)]
 pub struct Date {
     day: u8,
     month: Month,
-    year: u16,
+    year: i32,
+}
+
+impl Date {
+    fn from_time_date(d: time::Date) -> Date {
+        Date {
+            day: d.day(),
+            month: d.month(),
+            year: d.year(),
+        }
+    }
 }
 
 #[derive(Clone)]
 pub struct DateRange {
-    dates: Vec<OffsetDateTime>,
+    dates: Vec<Date>,
 }
 
 impl DateRange {
-    fn new(start: Date, end: Date) -> DateRange {
-        let dates: Vec<OffsetDateTime> = Vec::new();
+    fn new(start: Date, end: Date) -> Result<DateRange, TagesschauApiError> {
+        let mut dates: Vec<Date> = Vec::new();
 
-        let raw_dates: Vec<Date> = Vec::new();
+        let mut s = time::Date::from_calendar_date(start.year, start.month, start.day)
+            .map_err(|e| TagesschauApiError::DateParsingError(e))?;
 
-        // TODO Parse start and end and generate range in between, return as DateRange object
-        todo!()
+        let e = time::Date::from_calendar_date(end.year, end.month, end.day)
+            .map_err(|e| TagesschauApiError::DateParsingError(e))?;
+
+        while s <= e {
+            dates.push(Date::from_time_date(s));
+            s = s.next_day().unwrap();
+        }
+
+        Ok(DateRange { dates })
     }
 }
 
@@ -208,5 +227,6 @@ pub enum TagesschauApiError {
     #[error("Unable to retrieve current date")]
     DateError(time::error::IndeterminateOffset),
     // DateRangeError,
-    // DateParsingError,
+    #[error("Unable parse date")]
+    DateParsingError(time::error::ComponentRange),
 }
