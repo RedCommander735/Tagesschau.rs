@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
-use time::{Month, OffsetDateTime};
+use time::{Date, Month, OffsetDateTime};
 
 const BASE_URL: &str = "https://www.tagesschau.de/api2u/news?";
 
@@ -58,44 +58,53 @@ impl Ressort {
 
 pub enum Timeframe {
     Now,
-    Date(Date),
+    Date(TDate),
     DateRange(DateRange),
 }
 
 #[derive(Clone, Copy)]
-pub struct Date {
+pub struct TDate {
     day: u8,
     month: Month,
     year: i32,
 }
 
-impl Date {
-    fn from_time_date(d: time::Date) -> Date {
-        Date {
+impl TDate {
+    fn from_time_date(d: Date) -> TDate {
+        TDate {
             day: d.day(),
             month: d.month(),
             year: d.year(),
         }
     }
+
+    fn format(&self) -> String {
+        format!(
+            "{}{}{}",
+            self.year,
+            format!("{:0>2}", self.month as u8),
+            format!("{:0>2}", self.day)
+        )
+    }
 }
 
 #[derive(Clone)]
 pub struct DateRange {
-    dates: Vec<Date>,
+    dates: Vec<TDate>,
 }
 
 impl DateRange {
-    fn new(start: Date, end: Date) -> Result<DateRange, TagesschauApiError> {
-        let mut dates: Vec<Date> = Vec::new();
+    fn new(start: TDate, end: TDate) -> Result<DateRange, TagesschauApiError> {
+        let mut dates: Vec<TDate> = Vec::new();
 
-        let mut s = time::Date::from_calendar_date(start.year, start.month, start.day)
+        let mut s = Date::from_calendar_date(start.year, start.month, start.day)
             .map_err(|e| TagesschauApiError::DateParsingError(e))?;
 
-        let e = time::Date::from_calendar_date(end.year, end.month, end.day)
+        let e = Date::from_calendar_date(end.year, end.month, end.day)
             .map_err(|e| TagesschauApiError::DateParsingError(e))?;
 
         while s <= e {
-            dates.push(Date::from_time_date(s));
+            dates.push(TDate::from_time_date(s));
             s = s.next_day().unwrap();
         }
 
@@ -134,16 +143,15 @@ impl TagesschauAPI {
     }
 
     fn prepare_url(&self) -> Result<Vec<String>, TagesschauApiError> {
-        let dates: Vec<OffsetDateTime> = match &self.timeframe {
+        let dates: Vec<TDate> = match &self.timeframe {
             Timeframe::Now => {
                 let now =
                     OffsetDateTime::now_local().map_err(|e| TagesschauApiError::DateError(e))?;
 
-                vec![now]
+                vec![TDate::from_time_date(now.date())]
             }
             Timeframe::Date(date) => {
-                // TODO Parse date string here and return vec with date
-                todo!()
+                vec![*date]
             }
             Timeframe::DateRange(date_range) => date_range.dates.clone(),
         };
