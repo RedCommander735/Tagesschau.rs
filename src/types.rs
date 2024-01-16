@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
-use time::{format_description, OffsetDateTime};
+use time::{Month, OffsetDateTime};
 
 const BASE_URL: &str = "https://www.tagesschau.de/api2u/news?";
 
@@ -56,10 +56,16 @@ impl Ressort {
     }
 }
 
-pub enum Date {
+pub enum Timeframe {
     Now,
-    Date(String),
+    Date(Date),
     DateRange(DateRange),
+}
+
+pub struct Date {
+    day: u8,
+    month: Month,
+    year: u16,
 }
 
 #[derive(Clone)]
@@ -68,8 +74,10 @@ pub struct DateRange {
 }
 
 impl DateRange {
-    fn new(start: &str, end: &str) -> DateRange {
+    fn new(start: Date, end: Date) -> DateRange {
         let dates: Vec<OffsetDateTime> = Vec::new();
+
+        let raw_dates: Vec<Date> = Vec::new();
 
         // TODO Parse start and end and generate range in between, return as DateRange object
         todo!()
@@ -79,7 +87,7 @@ impl DateRange {
 struct TagesschauAPI {
     ressort: Ressort,
     regions: HashSet<Region>,
-    date: Date,
+    timeframe: Timeframe,
 }
 
 impl TagesschauAPI {
@@ -87,7 +95,7 @@ impl TagesschauAPI {
         TagesschauAPI {
             ressort: Ressort::None,
             regions: HashSet::new(),
-            date: Date::Now,
+            timeframe: Timeframe::Now,
         }
     }
 
@@ -101,24 +109,24 @@ impl TagesschauAPI {
         self
     }
 
-    fn date(&mut self, date: Date) -> &mut TagesschauAPI {
-        self.date = date;
+    fn date(&mut self, timeframe: Timeframe) -> &mut TagesschauAPI {
+        self.timeframe = timeframe;
         self
     }
 
     fn prepare_url(&self) -> Result<Vec<String>, TagesschauApiError> {
-        let dates: Vec<OffsetDateTime> = match &self.date {
-            Date::Now => {
+        let dates: Vec<OffsetDateTime> = match &self.timeframe {
+            Timeframe::Now => {
                 let now =
                     OffsetDateTime::now_local().map_err(|e| TagesschauApiError::DateError(e))?;
 
                 vec![now]
             }
-            Date::Date(date) => {
+            Timeframe::Date(date) => {
                 // TODO Parse date string here and return vec with date
                 todo!()
             }
-            Date::DateRange(date_range) => date_range.dates.clone(),
+            Timeframe::DateRange(date_range) => date_range.dates.clone(),
         };
 
         // TODO for each date build the relevant string from date, region and ressort
