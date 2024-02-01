@@ -87,8 +87,6 @@ impl Display for Ressort {
     }
 }
 
-//TODO - Add support for multiple Ressorts
-
 pub enum Timeframe {
     Now,
     Date(TDate),
