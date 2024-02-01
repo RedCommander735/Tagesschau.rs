@@ -212,8 +212,6 @@ impl TagesschauAPI {
     async fn fetch(&self, date: TDate) -> Result<Articles, TagesschauApiError> {
         let url = self.prepare_url(date)?;
 
-        println!("{}", url);
-
         let response = reqwest::get(url)
             .await
             .map_err(|e| TagesschauApiError::BadRequest(e))?;
