@@ -1,4 +1,4 @@
-#![warn(missing_docs)]
+// #![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
 
 use reqwest;
@@ -349,13 +349,15 @@ pub struct Text {
     pub date: OffsetDateTime,
     #[serde(rename(deserialize = "detailsweb"))]
     pub url: String,
+    #[serde(default = "default_tag_vec")]
     pub tags: Vec<Tag>,
-    pub ressort: Option<String>,
+    #[serde(default = "default_string")]
+    pub ressort: String,
     #[serde(rename(deserialize = "type"))]
     pub kind: String,
-    #[serde(rename(deserialize = "breakingNews"))]
+    #[serde(rename(deserialize = "breakingNews"), default = "default_bool")]
     pub breaking_news: bool,
-    #[serde(rename(deserialize = "teaserImage"))]
+    #[serde(rename(deserialize = "teaserImage"), default = "default_images")]
     pub image: Images,
 }
 
@@ -365,13 +367,15 @@ pub struct Video {
     #[serde(with = "rfc3339")]
     pub date: OffsetDateTime,
     pub streams: HashMap<String, String>,
+    #[serde(default = "default_tag_vec")]
     pub tags: Vec<Tag>,
-    pub ressort: Option<String>,
+    #[serde(default = "default_string")]
+    pub ressort: String,
     #[serde(rename(deserialize = "type"))]
     pub kind: String,
-    #[serde(rename(deserialize = "breakingNews"))]
+    #[serde(rename(deserialize = "breakingNews"), default = "default_bool")]
     pub breaking_news: bool,
-    #[serde(rename(deserialize = "teaserImage"))]
+    #[serde(rename(deserialize = "teaserImage"), default = "default_images")]
     pub image: Images,
 }
 
@@ -382,13 +386,42 @@ pub struct Tag {
 
 #[derive(Deserialize, Debug)]
 pub struct Images {
-    pub title: Option<String>,
-    pub copyright: Option<String>,
+    #[serde(default = "default_string")]
+    pub title: String,
+    #[serde(default = "default_string")]
+    pub copyright: String,
+    #[serde(default = "default_string")]
     pub alttext: String,
-    #[serde(rename(deserialize = "imageVariants"))]
+    #[serde(rename(deserialize = "imageVariants"), default = "default_hash_map")]
     pub image_variants: HashMap<String, String>,
     #[serde(rename(deserialize = "type"))]
     pub kind: String,
+}
+
+fn default_string() -> String {
+    "".to_string()
+}
+
+fn default_hash_map() -> HashMap<String, String> {
+    HashMap::new()
+}
+
+fn default_tag_vec() -> Vec<Tag> {
+    Vec::new()
+}
+
+fn default_bool() -> bool {
+    false
+}
+
+fn default_images() -> Images {
+    Images {
+        title: "".to_string(),
+        copyright: "".to_string(),
+        alttext: "".to_string(),
+        image_variants: HashMap::new(),
+        kind: "".to_string(),
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
