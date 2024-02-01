@@ -1,3 +1,6 @@
+// #![warn(missing_docs)]
+#![doc = include_str!("../README.md")]
+
 use reqwest;
 
 use reqwest::StatusCode;
@@ -6,7 +9,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
 };
-use time::{Date, Month, OffsetDateTime};
+use time::{serde::rfc3339, Date, Month, OffsetDateTime};
 use url::Url;
 
 const BASE_URL: &str = "https://www.tagesschau.de/api2u/news";
@@ -183,8 +186,6 @@ impl TagesschauAPI {
     async fn fetch(&self, date: TDate) -> Result<Articles, TagesschauApiError> {
         let url = self.prepare_url(date)?;
 
-        // println!("{}", url);
-
         let response = reqwest::get(url)
             .await
             .map_err(|e| TagesschauApiError::BadRequest(e))?;
@@ -316,14 +317,35 @@ impl Content {
 #[derive(Deserialize, Debug)]
 pub struct Text {
     pub title: String,
+    #[serde(with = "rfc3339")]
+    pub date: OffsetDateTime,
     #[serde(rename(deserialize = "detailsweb"))]
     pub url: String,
+    pub tags: Vec<Tag>,
+    pub ressort: String,
+    #[serde(rename(deserialize = "type"))]
+    pub kind: String,
+    #[serde(rename(deserialize = "breakingNews"))]
+    pub breaking_news: bool,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Video {
     pub title: String,
+    #[serde(with = "rfc3339")]
+    pub date: OffsetDateTime,
     pub streams: HashMap<String, String>,
+    pub tags: Vec<Tag>,
+    pub ressort: String,
+    #[serde(rename(deserialize = "type"))]
+    pub kind: String,
+    #[serde(rename(deserialize = "breakingNews"))]
+    pub breaking_news: bool,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Tag {
+    pub tag: String,
 }
 
 #[derive(thiserror::Error, Debug)]
