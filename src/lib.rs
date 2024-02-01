@@ -74,6 +74,15 @@ pub struct TDate {
 }
 
 impl TDate {
+    pub fn from_calendar_date(
+        year: i32,
+        month: Month,
+        day: u8,
+    ) -> Result<Self, TagesschauApiError> {
+        let date = Date::from_calendar_date(year, month, day)?;
+        Ok(TDate::from_time_date(date))
+    }
+
     pub fn from_time_date(d: Date) -> Self {
         TDate {
             day: d.day(),
@@ -85,7 +94,7 @@ impl TDate {
     pub fn format(&self) -> String {
         format!(
             "{}{}{}",
-            self.year,
+            self.year % 100,
             format!("{:0>2}", self.month as u8),
             format!("{:0>2}", self.day)
         )
@@ -174,7 +183,7 @@ impl TagesschauAPI {
     async fn fetch(&self, date: TDate) -> Result<Articles, TagesschauApiError> {
         let url = self.prepare_url(date)?;
 
-        // let response = reqwest::blocking::get(url)
+        // println!("{}", url);
 
         let response = reqwest::get(url)
             .await
