@@ -1,35 +1,34 @@
 use serde::Deserialize;
-use std::collections::{HashMap, HashSet};
-use time::{Date, Month, OffsetDateTime};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
+use time::{error, Date, Month, OffsetDateTime};
+use url::Url;
 
-const BASE_URL: &str = "https://www.tagesschau.de/api2u/news?";
+const BASE_URL: &str = "https://www.tagesschau.de/api2u/news";
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Region {
-    BadenWürttemberg,
-    Bayern,
-    Berlin,
-    Brandenburg,
-    Bremen,
-    Hamburg,
-    Hessen,
-    MecklenburgVorpommern,
-    Niedersachsen,
-    NordrheinWestfalen,
-    RheinlandPfalz,
-    Saarland,
-    Sachsen,
-    SachsenAnhalt,
-    SchleswigHolstein,
-    Thüringen,
+    BadenWürttemberg = 1,
+    Bayern = 2,
+    Berlin = 3,
+    Brandenburg = 4,
+    Bremen = 5,
+    Hamburg = 6,
+    Hessen = 7,
+    MecklenburgVorpommern = 8,
+    Niedersachsen = 9,
+    NordrheinWestfalen = 10,
+    RheinlandPfalz = 11,
+    Saarland = 12,
+    Sachsen = 13,
+    SachsenAnhalt = 14,
+    SchleswigHolstein = 15,
+    Thüringen = 16,
 }
 
-impl Region {
-    pub fn index(&self) -> usize {
-        (*self as usize) + 1
-    }
-}
-
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ressort {
     None,
     Inland,
@@ -41,20 +40,22 @@ pub enum Ressort {
     Wissen,
 }
 
-impl Ressort {
-    pub fn as_text(self) -> String {
+impl Display for Ressort {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Ressort::None => "".to_owned(),
-            Ressort::Inland => "inland".to_owned(),
-            Ressort::Ausland => "ausland".to_owned(),
-            Ressort::Wirtschaft => "wirtschaft".to_owned(),
-            Ressort::Sport => "sport".to_owned(),
-            Ressort::Video => "video".to_owned(),
-            Ressort::Investigativ => "investigativ".to_owned(),
-            Ressort::Wissen => "wissen".to_owned(),
+            Ressort::None => f.write_str(""),
+            Ressort::Inland => f.write_str("inland"),
+            Ressort::Ausland => f.write_str("ausland"),
+            Ressort::Wirtschaft => f.write_str("wirtschaft"),
+            Ressort::Sport => f.write_str("sport"),
+            Ressort::Video => f.write_str("video"),
+            Ressort::Investigativ => f.write_str("investigativ"),
+            Ressort::Wissen => f.write_str("wissen"),
         }
     }
 }
+
+//TODO - Add support for multiple Ressorts
 
 pub enum Timeframe {
     Now,
@@ -70,7 +71,7 @@ pub struct TDate {
 }
 
 impl TDate {
-    fn from_time_date(d: Date) -> TDate {
+    fn from_time_date(d: Date) -> Self {
         TDate {
             day: d.day(),
             month: d.month(),
@@ -94,7 +95,7 @@ pub struct DateRange {
 }
 
 impl DateRange {
-    fn new(start: TDate, end: TDate) -> Result<DateRange, TagesschauApiError> {
+    fn new(start: TDate, end: TDate) -> Result<Self, TagesschauApiError> {
         let mut dates: Vec<TDate> = Vec::new();
 
         let mut s = Date::from_calendar_date(start.year, start.month, start.day)
@@ -108,7 +109,11 @@ impl DateRange {
             s = s.next_day().unwrap();
         }
 
-        Ok(DateRange { dates })
+        Ok(Self { dates })
+    }
+
+    fn from_dates(dates: Vec<TDate>) -> Self {
+        Self { dates }
     }
 }
 
@@ -119,8 +124,8 @@ struct TagesschauAPI {
 }
 
 impl TagesschauAPI {
-    fn new() -> TagesschauAPI {
-        TagesschauAPI {
+    fn new() -> Self {
+        Self {
             ressort: Ressort::None,
             regions: HashSet::new(),
             timeframe: Timeframe::Now,
@@ -137,12 +142,36 @@ impl TagesschauAPI {
         self
     }
 
-    fn date(&mut self, timeframe: Timeframe) -> &mut TagesschauAPI {
+    fn timeframe(&mut self, timeframe: Timeframe) -> &mut TagesschauAPI {
         self.timeframe = timeframe;
         self
     }
 
-    fn prepare_url(&self) -> Result<Vec<String>, TagesschauApiError> {
+    fn prepare_url(&self, date: TDate) -> Result<String, TagesschauApiError> {
+        // TODO for each date build the relevant string from date, region and ressort
+
+        let mut url = Url::parse(BASE_URL)?;
+
+        url.query_pairs_mut().append_pair("date", &date.format());
+
+        if !self.regions.is_empty() {
+            let mut r = String::new();
+            for region in &self.regions {
+                r.push_str(&format!("{},", *region as u8));
+            }
+
+            url.query_pairs_mut().append_pair("regions", &r);
+        }
+
+        if self.ressort != Ressort::None {
+            url.query_pairs_mut()
+                .append_pair("ressort", &self.ressort.to_string());
+        }
+
+        Ok(url.to_string())
+    }
+
+    fn get_articles(&self) -> Result<Content, TagesschauApiError> {
         let dates: Vec<TDate> = match &self.timeframe {
             Timeframe::Now => {
                 let now =
@@ -156,7 +185,14 @@ impl TagesschauAPI {
             Timeframe::DateRange(date_range) => date_range.dates.clone(),
         };
 
-        // TODO for each date build the relevant string from date, region and ressort
+        let mut urls: Vec<String> = Vec::new();
+
+        for date in dates {
+            let url = self.prepare_url(date)?;
+            // TODO get articles directly
+            urls.push(url);
+        }
+
         todo!()
     }
 }
@@ -237,4 +273,6 @@ pub enum TagesschauApiError {
     // DateRangeError,
     #[error("Unable parse date")]
     DateParsingError(time::error::ComponentRange),
+    #[error("Url parsing failed")]
+    UrlParsing(#[from] url::ParseError),
 }
