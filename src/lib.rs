@@ -4,11 +4,14 @@
 use reqwest;
 
 use reqwest::StatusCode;
-use serde::Deserialize;
+use serde::{
+    de::{self, Visitor},
+    Deserialize,
+};
 use std::{
+    cmp::Ordering,
     collections::{HashMap, HashSet},
-    fmt::Display,
-    iter,
+    fmt::{self, Display},
 };
 use time::{serde::rfc3339, Date, OffsetDateTime};
 use url::Url;
@@ -119,8 +122,37 @@ impl Month {
     }
 }
 
+struct RessortVisitor;
+
+impl<'de> Visitor<'de> for RessortVisitor {
+    type Value = Ressort;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a string with one of the following values: inland, ausland, wirtschaft, sport, video, investigativ")
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        match value.as_str() {
+            "" => Ok(Ressort::None),
+            "inland" => Ok(Ressort::Inland),
+            "ausland" => Ok(Ressort::Ausland),
+            "wirtschaft" => Ok(Ressort::Wirtschaft),
+            "sport" => Ok(Ressort::Sport),
+            "video" => Ok(Ressort::Video),
+            "investigativ" => Ok(Ressort::Investigativ),
+            _ => Err(E::custom(format!(
+                "String does not contain expected value: {}",
+                value
+            ))),
+        }
+    }
+}
+
 /// The different available news categorys
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum Ressort {
     /// With this option, the ressort will not be specified and all results will be shown.
     None,
@@ -139,7 +171,7 @@ pub enum Ressort {
 }
 
 impl Display for Ressort {
-    /// Formats the ressort value in a way that is usable by the underlying api.
+    /// Formats the ressort value in a way that is usable by the underlying API.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Ressort::None => f.write_str(""),
@@ -151,6 +183,15 @@ impl Display for Ressort {
             Ressort::Investigativ => f.write_str("investigativ"),
             // Ressort::Faktenfinder => f.write_str("faktenfinder"),
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for Ressort {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_str(RessortVisitor)
     }
 }
 
@@ -179,7 +220,7 @@ impl TDate {
         Ok(TDate::from_time_date(date))
     }
 
-    /// Creates a `TDate` from a [Date](time::Date).
+    /// Creates a `TDate` from a [Date].
     pub fn from_time_date(d: Date) -> Self {
         TDate {
             day: d.day(),
@@ -188,7 +229,7 @@ impl TDate {
         }
     }
 
-    /// Formats the date in a way that is usable by the underlying api (yymmdd).
+    /// Formats the date in a way that is usable by the underlying API (yymmdd).
     fn format(&self) -> String {
         format!(
             "{}{}{}",
@@ -206,6 +247,7 @@ pub struct DateRange {
 }
 
 impl DateRange {
+    /// Generates a `DateRange` by encompassing dates within the range defined by two specified [`TDates`](TDate).
     pub fn new(start: TDate, end: TDate) -> Result<Self, Error> {
         let mut dates: Vec<TDate> = Vec::new();
 
@@ -223,6 +265,7 @@ impl DateRange {
         })
     }
 
+    /// Creates a `DateRange` from a collection of [`TDates`](TDate).
     pub fn from_dates(dates: Vec<TDate>) -> Self {
         Self {
             dates: HashSet::from_iter(dates.into_iter()),
@@ -230,6 +273,8 @@ impl DateRange {
     }
 }
 
+/// A queryable `Tagesschau API` object that is comprised of a news ressort, a set of federal states to query,
+/// for news from within Germany and a timeframe for which to query articles.
 pub struct TagesschauAPI {
     ressort: Ressort,
     regions: HashSet<Region>,
@@ -237,6 +282,7 @@ pub struct TagesschauAPI {
 }
 
 impl TagesschauAPI {
+    /// Creates a `TagesschauAPI` with no specified ressort, region and the current date as timeframe.
     pub fn new() -> Self {
         Self {
             ressort: Ressort::None,
@@ -245,21 +291,25 @@ impl TagesschauAPI {
         }
     }
 
+    /// Sets an existing `TagesschauAPI` Objects selected ressort.
     pub fn ressort(&mut self, res: Ressort) -> &mut TagesschauAPI {
         self.ressort = res;
         self
     }
 
+    /// Sets an existing `TagesschauAPI` Objects selected regions.
     pub fn regions(&mut self, reg: HashSet<Region>) -> &mut TagesschauAPI {
         self.regions = reg;
         self
     }
 
+    /// Sets an existing `TagesschauAPI` Objects selected timeframe.
     pub fn timeframe(&mut self, timeframe: Timeframe) -> &mut TagesschauAPI {
         self.timeframe = timeframe;
         self
     }
 
+    /// Creates the queryable URL for the `fetch` method.
     fn prepare_url(&self, date: TDate) -> Result<String, Error> {
         // TODO - Support multiple ressorts
         let mut url = Url::parse(BASE_URL)?;
@@ -283,6 +333,7 @@ impl TagesschauAPI {
         Ok(url.to_string())
     }
 
+    /// Processes the URLs created by `prepare_url`.
     async fn fetch(&self, date: TDate) -> Result<Articles, Error> {
         let url = self.prepare_url(date)?;
 
@@ -298,6 +349,7 @@ impl TagesschauAPI {
         Ok(articles)
     }
 
+    /// Query all articles that match the parameters currently specified on the `TagesschauAPI` Object.
     pub async fn get_all_articles(&self) -> Result<Vec<Content>, Error> {
         let dates: Vec<TDate> = match &self.timeframe {
             Timeframe::Now => {
@@ -308,7 +360,9 @@ impl TagesschauAPI {
             Timeframe::Date(date) => {
                 vec![*date]
             }
-            Timeframe::DateRange(date_range) => date_range.dates.clone(),
+            Timeframe::DateRange(date_range) => {
+                Vec::from_iter(date_range.dates.clone().into_iter())
+            }
         };
 
         let mut content: Vec<Content> = Vec::new();
@@ -319,9 +373,30 @@ impl TagesschauAPI {
             content.append(&mut art.news)
         }
 
+        content.sort_by(|element, next| {
+            let date_element = match element {
+                Content::Text(t) => t.date,
+                Content::Video(v) => v.date,
+            };
+
+            let date_next = match next {
+                Content::Text(t) => t.date,
+                Content::Video(v) => v.date,
+            };
+
+            if date_element > date_next {
+                Ordering::Greater
+            } else if date_element < date_next {
+                Ordering::Less
+            } else {
+                Ordering::Equal
+            }
+        });
+
         Ok(content)
     }
 
+    /// Query only [`Text`] articles that match the parameters currently specified on the `TagesschauAPI` Object.
     pub async fn get_text_articles(&self) -> Result<Vec<Text>, Error> {
         let articles = self.get_all_articles().await;
 
@@ -340,6 +415,7 @@ impl TagesschauAPI {
         }
     }
 
+    /// Query only [`Videos`](Video) that match the parameters currently specified on the `TagesschauAPI` Object.
     pub async fn get_video_articles(&self) -> Result<Vec<Video>, Error> {
         let articles = self.get_all_articles().await;
 
@@ -360,14 +436,17 @@ impl TagesschauAPI {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Articles {
-    pub news: Vec<Content>,
+struct Articles {
+    news: Vec<Content>,
 }
 
+/// A value returned by the API that can be either a text article or a video.
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Content {
+    #[allow(missing_docs)]
     Text(Text),
+    #[allow(missing_docs)]
     Video(Video),
 }
 
@@ -378,6 +457,7 @@ impl PartialEq for Content {
 }
 
 impl Content {
+    /// Checks if the `Content` is a [`Text`].
     pub fn is_text(&self) -> bool {
         match self {
             Content::Text(_) => true,
@@ -385,6 +465,7 @@ impl Content {
         }
     }
 
+    /// Checks if the `Content` is a [`Video`].
     pub fn is_video(&self) -> bool {
         match self {
             Content::Text(_) => false,
@@ -392,6 +473,7 @@ impl Content {
         }
     }
 
+    /// Unpacks a and returns a [`Text`].
     pub fn to_text(self) -> Result<Text, Error> {
         match self {
             Content::Text(text) => Ok(text),
@@ -399,6 +481,7 @@ impl Content {
         }
     }
 
+    /// Unpacks a and returns a [`Video`].
     pub fn to_video(self) -> Result<Video, Error> {
         match self {
             Content::Video(video) => Ok(video),
@@ -407,58 +490,87 @@ impl Content {
     }
 }
 
+/// A text article returned by the API, that contains a title, publishing [datetime](OffsetDateTime), URL to the actual post, a list of [tags](Tag) (optional),
+/// a [Ressort] value (optional), what kind of article it is (optional), if it is breaking news (optional) and an image related to the article (optional).
 #[derive(Deserialize, Debug)]
 pub struct Text {
+    #[allow(missing_docs)]
     pub title: String,
+    #[allow(missing_docs)]
     #[serde(with = "rfc3339")]
     pub date: OffsetDateTime,
+    #[allow(missing_docs)]
     #[serde(rename(deserialize = "detailsweb"))]
     pub url: String,
+    #[allow(missing_docs)]
     #[serde(default = "default_tag_vec")]
     pub tags: Vec<Tag>,
-    #[serde(default = "default_string")]
-    pub ressort: String,
+    #[allow(missing_docs)]
+    #[serde(default = "default_ressort")]
+    pub ressort: Ressort,
+    #[allow(missing_docs)]
     #[serde(rename(deserialize = "type"))]
     pub kind: String,
+    #[allow(missing_docs)]
     #[serde(rename(deserialize = "breakingNews"), default = "default_bool")]
     pub breaking_news: bool,
+    #[allow(missing_docs)]
     #[serde(rename(deserialize = "teaserImage"), default = "default_images")]
     pub image: Images,
 }
 
+/// A video returned by the API, that contains a title, publishing [datetime](OffsetDateTime), a list of available streams, a list of [tags](Tag) (optional),
+/// a [Ressort] value (optional), what kind of video it is (optional), if it is breaking news (optional) and an image related to the video (optional).
 #[derive(Deserialize, Debug)]
 pub struct Video {
+    #[allow(missing_docs)]
     pub title: String,
+    #[allow(missing_docs)]
     #[serde(with = "rfc3339")]
     pub date: OffsetDateTime,
+    #[allow(missing_docs)]
+    /// A [`HashMap`] consisting of (stream type, URL) (key, value) pairs.
     pub streams: HashMap<String, String>,
+    #[allow(missing_docs)]
     #[serde(default = "default_tag_vec")]
     pub tags: Vec<Tag>,
+    #[allow(missing_docs)]
     #[serde(default = "default_string")]
     pub ressort: String,
+    #[allow(missing_docs)]
     #[serde(rename(deserialize = "type"))]
     pub kind: String,
+    #[allow(missing_docs)]
     #[serde(rename(deserialize = "breakingNews"), default = "default_bool")]
     pub breaking_news: bool,
+    #[allow(missing_docs)]
     #[serde(rename(deserialize = "teaserImage"), default = "default_images")]
     pub image: Images,
 }
 
+/// A tag value for a [`Text`] or a [`Video`].
 #[derive(Deserialize, Debug)]
 pub struct Tag {
+    #[allow(missing_docs)]
     pub tag: String,
 }
 
+/// A struct that contains an images metadata and variants.
 #[derive(Deserialize, Debug)]
 pub struct Images {
+    #[allow(missing_docs)]
     #[serde(default = "default_string")]
     pub title: String,
     #[serde(default = "default_string")]
+    #[allow(missing_docs)]
     pub copyright: String,
     #[serde(default = "default_string")]
+    #[allow(missing_docs)]
     pub alttext: String,
+    /// A [`HashMap`] consisting of (image size, URL) (key, value) pairs
     #[serde(rename(deserialize = "imageVariants"), default = "default_hash_map")]
     pub image_variants: HashMap<String, String>,
+    #[allow(missing_docs)]
     #[serde(rename(deserialize = "type"))]
     pub kind: String,
 }
@@ -489,7 +601,11 @@ fn default_images() -> Images {
     }
 }
 
-/// The Errors that might occur when using the api
+fn default_ressort() -> Ressort {
+    Ressort::None
+}
+
+/// The Errors that might occur when using the API
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[allow(missing_docs)]
