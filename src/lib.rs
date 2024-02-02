@@ -8,6 +8,7 @@ use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
+    iter,
 };
 use time::{serde::rfc3339, Date, OffsetDateTime};
 use url::Url;
@@ -138,6 +139,7 @@ pub enum Ressort {
 }
 
 impl Display for Ressort {
+    /// Formats the ressort value in a way that is usable by the underlying api.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Ressort::None => f.write_str(""),
@@ -152,18 +154,18 @@ impl Display for Ressort {
     }
 }
 
-/// A timeframe for which the news should be fetched
+/// A timeframe for which the news should be fetched.
 pub enum Timeframe {
-    /// The current date
+    /// The current date.
     Now,
-    /// A specific singular date
+    /// A specific singular date.
     Date(TDate),
-    /// A range of dates
+    /// A range of dates.
     DateRange(DateRange),
 }
 
-/// A date format for usage in [`Timeframes`](Timeframe)
-#[derive(Clone, Copy)]
+/// A date format for usage in [`Timeframes`](Timeframe).
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TDate {
     day: u8,
     month: Month,
@@ -177,7 +179,7 @@ impl TDate {
         Ok(TDate::from_time_date(date))
     }
 
-    /// Creates a `TDate` from a [Date](time::Date)
+    /// Creates a `TDate` from a [Date](time::Date).
     pub fn from_time_date(d: Date) -> Self {
         TDate {
             day: d.day(),
@@ -186,6 +188,7 @@ impl TDate {
         }
     }
 
+    /// Formats the date in a way that is usable by the underlying api (yymmdd).
     fn format(&self) -> String {
         format!(
             "{}{}{}",
@@ -196,9 +199,10 @@ impl TDate {
     }
 }
 
+/// A collection of unique [`TDates`](TDate).
 #[derive(Clone)]
 pub struct DateRange {
-    dates: Vec<TDate>,
+    dates: HashSet<TDate>,
 }
 
 impl DateRange {
@@ -214,11 +218,15 @@ impl DateRange {
             s = s.next_day().unwrap();
         }
 
-        Ok(Self { dates })
+        Ok(Self {
+            dates: HashSet::from_iter(dates.into_iter()),
+        })
     }
 
     pub fn from_dates(dates: Vec<TDate>) -> Self {
-        Self { dates }
+        Self {
+            dates: HashSet::from_iter(dates.into_iter()),
+        }
     }
 }
 
