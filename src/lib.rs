@@ -1,4 +1,4 @@
-// #![warn(missing_docs)]
+#![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
 
 use reqwest;
@@ -9,7 +9,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
 };
-use time::{serde::rfc3339, Date, Month, OffsetDateTime};
+use time::{serde::rfc3339, Date, OffsetDateTime};
 use url::Url;
 
 const BASE_URL: &str = "https://www.tagesschau.de/api2u/news";
@@ -52,24 +52,89 @@ pub enum Region {
     Thüringen = 16,
 }
 
-/// Different news categorys
+/// Months of the year.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Month {
+    #[allow(missing_docs)]
+    January = 1,
+    #[allow(missing_docs)]
+    February = 2,
+    #[allow(missing_docs)]
+    March = 3,
+    #[allow(missing_docs)]
+    April = 4,
+    #[allow(missing_docs)]
+    May = 5,
+    #[allow(missing_docs)]
+    June = 6,
+    #[allow(missing_docs)]
+    July = 7,
+    #[allow(missing_docs)]
+    August = 8,
+    #[allow(missing_docs)]
+    September = 9,
+    #[allow(missing_docs)]
+    October = 10,
+    #[allow(missing_docs)]
+    November = 11,
+    #[allow(missing_docs)]
+    December = 12,
+}
+
+impl Month {
+    fn to_time_month(&self) -> time::Month {
+        match self {
+            Month::January => time::Month::January,
+            Month::February => time::Month::February,
+            Month::March => time::Month::March,
+            Month::April => time::Month::April,
+            Month::May => time::Month::May,
+            Month::June => time::Month::June,
+            Month::July => time::Month::July,
+            Month::August => time::Month::August,
+            Month::September => time::Month::September,
+            Month::October => time::Month::October,
+            Month::November => time::Month::November,
+            Month::December => time::Month::December,
+        }
+    }
+
+    fn from_time_month(m: time::Month) -> Self {
+        match m {
+            time::Month::January => Month::January,
+            time::Month::February => Month::February,
+            time::Month::March => Month::March,
+            time::Month::April => Month::April,
+            time::Month::May => Month::May,
+            time::Month::June => Month::June,
+            time::Month::July => Month::July,
+            time::Month::August => Month::August,
+            time::Month::September => Month::September,
+            time::Month::October => Month::October,
+            time::Month::November => Month::November,
+            time::Month::December => Month::December,
+        }
+    }
+}
+
+/// The different available news categorys
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum Ressort {
-    /// With this option, the ressort will not be specified and all results will be shown
+    /// With this option, the ressort will not be specified and all results will be shown.
     None,
-    /// Only news from Germany
+    /// Only news from Germany.
     Inland,
-    /// Only news from outside of Germany
+    /// Only news from outside of Germany.
     Ausland,
-    /// Economic news
+    /// Economic news.
     Wirtschaft,
-    /// Sports news
+    /// Sports news.
     Sport,
-    /// Different kinds of videos
+    /// Different kinds of videos.
     Video,
-    /// Investigative journalism
+    /// Investigative journalism.
     Investigativ,
-    // Faktenfinder,
 }
 
 impl Display for Ressort {
@@ -87,12 +152,17 @@ impl Display for Ressort {
     }
 }
 
+/// A timeframe for which the news should be fetched
 pub enum Timeframe {
+    /// The current date
     Now,
+    /// A specific singular date
     Date(TDate),
+    /// A range of dates
     DateRange(DateRange),
 }
 
+/// A date format for usage in [`Timeframes`](Timeframe)
 #[derive(Clone, Copy)]
 pub struct TDate {
     day: u8,
@@ -101,24 +171,22 @@ pub struct TDate {
 }
 
 impl TDate {
-    pub fn from_calendar_date(
-        year: i32,
-        month: Month,
-        day: u8,
-    ) -> Result<Self, TagesschauApiError> {
-        let date = Date::from_calendar_date(year, month, day)?;
+    /// Creates a `TDate` from the year, month, and day.
+    pub fn from_calendar_date(year: i32, month: Month, day: u8) -> Result<Self, Error> {
+        let date = Date::from_calendar_date(year, month.to_time_month(), day)?;
         Ok(TDate::from_time_date(date))
     }
 
+    /// Creates a `TDate` from a [Date](time::Date)
     pub fn from_time_date(d: Date) -> Self {
         TDate {
             day: d.day(),
-            month: d.month(),
+            month: Month::from_time_month(d.month()),
             year: d.year(),
         }
     }
 
-    pub fn format(&self) -> String {
+    fn format(&self) -> String {
         format!(
             "{}{}{}",
             self.year % 100,
@@ -134,12 +202,12 @@ pub struct DateRange {
 }
 
 impl DateRange {
-    pub fn new(start: TDate, end: TDate) -> Result<Self, TagesschauApiError> {
+    pub fn new(start: TDate, end: TDate) -> Result<Self, Error> {
         let mut dates: Vec<TDate> = Vec::new();
 
-        let mut s = Date::from_calendar_date(start.year, start.month, start.day)?;
+        let mut s = Date::from_calendar_date(start.year, start.month.to_time_month(), start.day)?;
 
-        let e = Date::from_calendar_date(end.year, end.month, end.day)?;
+        let e = Date::from_calendar_date(end.year, end.month.to_time_month(), end.day)?;
 
         while s <= e {
             dates.push(TDate::from_time_date(s));
@@ -184,7 +252,7 @@ impl TagesschauAPI {
         self
     }
 
-    fn prepare_url(&self, date: TDate) -> Result<String, TagesschauApiError> {
+    fn prepare_url(&self, date: TDate) -> Result<String, Error> {
         // TODO - Support multiple ressorts
         let mut url = Url::parse(BASE_URL)?;
 
@@ -207,21 +275,14 @@ impl TagesschauAPI {
         Ok(url.to_string())
     }
 
-    async fn fetch(&self, date: TDate) -> Result<Articles, TagesschauApiError> {
+    async fn fetch(&self, date: TDate) -> Result<Articles, Error> {
         let url = self.prepare_url(date)?;
 
-        let response = reqwest::get(url)
-            .await
-            .map_err(|e| TagesschauApiError::BadRequest(e))?;
+        let response = reqwest::get(url).await.map_err(|e| Error::BadRequest(e))?;
 
         let text = match response.status() {
-            StatusCode::OK => response
-                .text()
-                .await
-                .map_err(|e| TagesschauApiError::ParsingError(e))?,
-            _ => Err(TagesschauApiError::InvalidResponse(
-                response.status().as_u16(),
-            ))?,
+            StatusCode::OK => response.text().await.map_err(|e| Error::ParsingError(e))?,
+            _ => Err(Error::InvalidResponse(response.status().as_u16()))?,
         };
 
         let articles: Articles = serde_json::from_str(&text)?;
@@ -229,7 +290,7 @@ impl TagesschauAPI {
         Ok(articles)
     }
 
-    pub async fn get_all_articles(&self) -> Result<Vec<Content>, TagesschauApiError> {
+    pub async fn get_all_articles(&self) -> Result<Vec<Content>, Error> {
         let dates: Vec<TDate> = match &self.timeframe {
             Timeframe::Now => {
                 let now = OffsetDateTime::now_local()?;
@@ -253,7 +314,7 @@ impl TagesschauAPI {
         Ok(content)
     }
 
-    pub async fn get_text_articles(&self) -> Result<Vec<Text>, TagesschauApiError> {
+    pub async fn get_text_articles(&self) -> Result<Vec<Text>, Error> {
         let articles = self.get_all_articles().await;
 
         match articles {
@@ -271,7 +332,7 @@ impl TagesschauAPI {
         }
     }
 
-    pub async fn get_video_articles(&self) -> Result<Vec<Video>, TagesschauApiError> {
+    pub async fn get_video_articles(&self) -> Result<Vec<Video>, Error> {
         let articles = self.get_all_articles().await;
 
         match articles {
@@ -323,17 +384,17 @@ impl Content {
         }
     }
 
-    pub fn to_text(self) -> Result<Text, TagesschauApiError> {
+    pub fn to_text(self) -> Result<Text, Error> {
         match self {
             Content::Text(text) => Ok(text),
-            Content::Video(_) => Err(TagesschauApiError::ConversionError),
+            Content::Video(_) => Err(Error::ConversionError),
         }
     }
 
-    pub fn to_video(self) -> Result<Video, TagesschauApiError> {
+    pub fn to_video(self) -> Result<Video, Error> {
         match self {
             Content::Video(video) => Ok(video),
-            Content::Text(_) => Err(TagesschauApiError::ConversionError),
+            Content::Text(_) => Err(Error::ConversionError),
         }
     }
 }
@@ -420,23 +481,31 @@ fn default_images() -> Images {
     }
 }
 
+/// The Errors that might occur when using the api
 #[derive(thiserror::Error, Debug)]
-pub enum TagesschauApiError {
+pub enum Error {
+    #[allow(missing_docs)]
     #[error("Fetching articles failed")]
     BadRequest(reqwest::Error),
+    #[allow(missing_docs)]
     #[error("Failed to parse response")]
     ParsingError(reqwest::Error),
+    #[allow(missing_docs)]
     #[error("Invalid Response: HTTP Response Code {0}")]
     InvalidResponse(u16),
+    #[allow(missing_docs)]
     #[error("Failed to deserialize response")]
     DeserializationError(#[from] serde_json::Error),
+    #[allow(missing_docs)]
     #[error("Tried to extract wrong type")]
     ConversionError,
+    #[allow(missing_docs)]
     #[error("Unable to retrieve current date")]
     DateError(#[from] time::error::IndeterminateOffset),
-    // DateRangeError,
+    #[allow(missing_docs)]
     #[error("Unable parse date")]
     DateParsingError(#[from] time::error::ComponentRange),
+    #[allow(missing_docs)]
     #[error("Url parsing failed")]
     UrlParsing(#[from] url::ParseError),
 }
