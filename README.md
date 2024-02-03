@@ -10,7 +10,6 @@ A client library for interacting with the [Tagesschau](https://www.tagesschau.de
 
 ## Example
 ```rust
-
 let start = TDate::from_calendar_date(2024, Month::January, 20)?;
 let end = TDate::from_calendar_date(2024, Month::January, 31)?;
 
