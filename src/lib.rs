@@ -470,6 +470,8 @@ impl Content {
 #[derive(Deserialize, Debug)]
 pub struct TextArticle {
     title: String,
+    #[serde(rename(deserialize = "firstSentence"))]
+    first_sentence: String,
     #[serde(with = "rfc3339")]
     date: OffsetDateTime,
     #[serde(rename(deserialize = "detailsweb"))]
@@ -488,6 +490,11 @@ impl TextArticle {
     /// Get the title of this `TextArticle`.
     pub fn title(&self) -> &str {
         &self.title
+    }
+
+    /// Get the first sentence of this `TextArticle`.
+    pub fn first_sentence(&self) -> &str {
+        &self.first_sentence
     }
 
     /// Get the publishing time of this `TextArticle` as [OffsetDateTime].
