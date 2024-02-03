@@ -1,9 +1,3 @@
-
-TODO:
-- [ ] More documentation with (code) examples
-- [ ] Support for multiple ressorts
-
-
 # tagesschau-rs
 
 <!-- [![Build Status]()]() -->
@@ -17,25 +11,24 @@ A client library for interacting with the [Tagesschau](https://www.tagesschau.de
 
 ## Example
 ```rust
-# #[tokio::main]
-# async fn main() {
-    let start = TDate::from_calendar_date(2024, Month::January, 20).unwrap();
-    let end = TDate::from_calendar_date(2024, Month::January, 31).unwrap();
 
-    let mut builder = TRequestBuilder::new();
+let start = TDate::from_calendar_date(2024, Month::January, 20).unwrap();
+let end = TDate::from_calendar_date(2024, Month::January, 31).unwrap();
 
-    builder
-        .ressort(Ressort::Wirtschaft)
-        .timeframe(tagesschau::Timeframe::DateRange(
-            DateRange::new(start, end).unwrap(),
-        ));
+let mut builder = TRequestBuilder::new();
 
-    let articles: Vec<TextArticle> = builder.get_text_articles().await.unwrap();
+builder
+    .ressort(Ressort::Wirtschaft)
+    .timeframe(tagesschau::Timeframe::DateRange(
+        DateRange::new(start, end).unwrap(),
+    ));
 
-    for article in articles {
-        println!("{} - {}", article.title(), article.date().time());
-    }
-# }
+let articles: Vec<TextArticle> = builder.get_text_articles().await.unwrap();
+
+for article in articles {
+    println!("{} - {}", article.title(), article.date().time());
+}
+
 ```
 <details><summary>Results in something like</summary>
 
@@ -49,6 +42,9 @@ Fed enttäuscht Zinshoffnungen - 22:16:27.875
 </details>
 
 <!-- cargo-rdme end -->
+
+## TODO:
+- [ ] Support for multiple ressorts
 
 ## License
 
