@@ -12,18 +12,18 @@ A client library for interacting with the [Tagesschau](https://www.tagesschau.de
 ## Example
 ```rust
 
-let start = TDate::from_calendar_date(2024, Month::January, 20).unwrap();
-let end = TDate::from_calendar_date(2024, Month::January, 31).unwrap();
+let start = TDate::from_calendar_date(2024, Month::January, 20)?;
+let end = TDate::from_calendar_date(2024, Month::January, 31)?;
 
 let mut builder = TRequestBuilder::new();
 
 builder
     .ressort(Ressort::Wirtschaft)
     .timeframe(tagesschau::Timeframe::DateRange(
-        DateRange::new(start, end).unwrap(),
+        DateRange::new(start, end)?,
     ));
 
-let articles: Vec<TextArticle> = builder.get_text_articles().await.unwrap();
+let articles: Vec<TextArticle> = builder.get_text_articles().await?;
 
 for article in articles {
     println!("{} - {}", article.title(), article.date().time());
