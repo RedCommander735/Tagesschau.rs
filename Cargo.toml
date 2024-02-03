@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 license-file = "LICENSE"
 description = "This crate provides an easy to use wrapper for german news provider Tagesschau"
-repository = "https://github.com/RedCommander735/TagesschauAPI.rs"
+repository = "https://github.com/RedCommander735/Tagesschau.rs"
 homepage = "https://github.com/RedCommander735"
 readme = "README.md"
 

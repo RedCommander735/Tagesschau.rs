@@ -273,16 +273,15 @@ impl DateRange {
     }
 }
 
-/// A queryable `Tagesschau API` object that is comprised of a news ressort, a set of federal states to query,
-/// for news from within Germany and a timeframe for which to query articles.
-pub struct TagesschauAPI {
+/// A client for the [Tagesschau](https://www.tagesschau.de) `/api2/news` endpoint.
+pub struct TRequestBuilder {
     ressort: Ressort,
     regions: HashSet<Region>,
     timeframe: Timeframe,
 }
 
-impl TagesschauAPI {
-    /// Creates a `TagesschauAPI` with no specified ressort, region and the current date as timeframe.
+impl TRequestBuilder {
+    /// Creates a `TRequestBuilder` with no specified ressort, region and the current date as timeframe.
     pub fn new() -> Self {
         Self {
             ressort: Ressort::None,
@@ -291,20 +290,20 @@ impl TagesschauAPI {
         }
     }
 
-    /// Sets an existing `TagesschauAPI` Objects selected ressort.
-    pub fn ressort(&mut self, res: Ressort) -> &mut TagesschauAPI {
+    /// Sets an existing `TRequestBuilder`'s selected ressort.
+    pub fn ressort(&mut self, res: Ressort) -> &mut TRequestBuilder {
         self.ressort = res;
         self
     }
 
-    /// Sets an existing `TagesschauAPI` Objects selected regions.
-    pub fn regions(&mut self, reg: HashSet<Region>) -> &mut TagesschauAPI {
+    /// Sets an existing `TRequestBuilder`'s selected regions.
+    pub fn regions(&mut self, reg: HashSet<Region>) -> &mut TRequestBuilder {
         self.regions = reg;
         self
     }
 
-    /// Sets an existing `TagesschauAPI` Objects selected timeframe.
-    pub fn timeframe(&mut self, timeframe: Timeframe) -> &mut TagesschauAPI {
+    /// Sets an existing `TRequestBuilder`'s selected timeframe.
+    pub fn timeframe(&mut self, timeframe: Timeframe) -> &mut TRequestBuilder {
         self.timeframe = timeframe;
         self
     }
@@ -349,7 +348,7 @@ impl TagesschauAPI {
         Ok(articles)
     }
 
-    /// Query all articles that match the parameters currently specified on the `TagesschauAPI` Object.
+    /// Query all articles that match the parameters currently specified on the `TRequestBuilder` Object.
     pub async fn get_all_articles(&self) -> Result<Vec<Content>, Error> {
         let dates: Vec<TDate> = match &self.timeframe {
             Timeframe::Now => {
@@ -396,7 +395,7 @@ impl TagesschauAPI {
         Ok(content)
     }
 
-    /// Query only [`Text`] articles that match the parameters currently specified on the `TagesschauAPI` Object.
+    /// Query only [`Text`] articles that match the parameters currently specified on the `TRequestBuilder` Object.
     pub async fn get_text_articles(&self) -> Result<Vec<Text>, Error> {
         let articles = self.get_all_articles().await;
 
@@ -415,7 +414,7 @@ impl TagesschauAPI {
         }
     }
 
-    /// Query only [`Videos`](Video) that match the parameters currently specified on the `TagesschauAPI` Object.
+    /// Query only [`Videos`](Video) that match the parameters currently specified on the `TRequestBuilder` Object.
     pub async fn get_video_articles(&self) -> Result<Vec<Video>, Error> {
         let articles = self.get_all_articles().await;
 
@@ -440,7 +439,7 @@ struct Articles {
     news: Vec<Content>,
 }
 
-/// A value returned by the API that can be either a text article or a video.
+/// A value returned by the [RequestBuilder] that can be either a text article or a video.
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Content {
@@ -490,8 +489,7 @@ impl Content {
     }
 }
 
-/// A text article returned by the API, that contains a title, publishing [datetime](OffsetDateTime), URL to the actual post, a list of [tags](Tag) (optional),
-/// a [Ressort] value (optional), what kind of article it is (optional), if it is breaking news (optional) and an image related to the article (optional).
+/// A text article returned by the API.
 #[derive(Deserialize, Debug)]
 pub struct Text {
     #[allow(missing_docs)]
@@ -516,11 +514,10 @@ pub struct Text {
     pub breaking_news: bool,
     #[allow(missing_docs)]
     #[serde(rename(deserialize = "teaserImage"), default = "default_images")]
-    pub image: Images,
+    pub image: Image,
 }
 
-/// A video returned by the API, that contains a title, publishing [datetime](OffsetDateTime), a list of available streams, a list of [tags](Tag) (optional),
-/// a [Ressort] value (optional), what kind of video it is (optional), if it is breaking news (optional) and an image related to the video (optional).
+/// A video returned by the API.
 #[derive(Deserialize, Debug)]
 pub struct Video {
     #[allow(missing_docs)]
@@ -545,7 +542,7 @@ pub struct Video {
     pub breaking_news: bool,
     #[allow(missing_docs)]
     #[serde(rename(deserialize = "teaserImage"), default = "default_images")]
-    pub image: Images,
+    pub image: Image,
 }
 
 /// A tag value for a [`Text`] or a [`Video`].
@@ -557,7 +554,7 @@ pub struct Tag {
 
 /// A struct that contains an images metadata and variants.
 #[derive(Deserialize, Debug)]
-pub struct Images {
+pub struct Image {
     #[allow(missing_docs)]
     #[serde(default = "default_string")]
     pub title: String,
@@ -591,8 +588,8 @@ fn default_bool() -> bool {
     false
 }
 
-fn default_images() -> Images {
-    Images {
+fn default_images() -> Image {
+    Image {
         title: "".to_string(),
         copyright: "".to_string(),
         alttext: "".to_string(),
