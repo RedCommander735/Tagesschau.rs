@@ -439,7 +439,7 @@ struct Articles {
     news: Vec<Content>,
 }
 
-/// A value returned by the [RequestBuilder] that can be either a text article or a video.
+/// A value returned by the [TRequestBuilder] that can be either a text article or a video.
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Content {
