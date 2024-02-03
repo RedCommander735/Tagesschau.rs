@@ -1,8 +1,8 @@
 [package]
 name = "tagesschau"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
-license-file = "LICENSE"
+license = "MIT"
 description = "This crate provides an easy to use wrapper for german news provider Tagesschau"
 repository = "https://github.com/RedCommander735/Tagesschau.rs"
 homepage = "https://github.com/RedCommander735"
