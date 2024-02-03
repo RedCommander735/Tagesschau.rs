@@ -152,7 +152,7 @@ impl<'de> Visitor<'de> for RessortVisitor {
 }
 
 /// The different available news categorys
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone)]
 pub enum Ressort {
     /// With this option, the ressort will not be specified and all results will be shown.
     None,
@@ -206,7 +206,7 @@ pub enum Timeframe {
 }
 
 /// A date format for usage in [`Timeframes`](Timeframe).
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct TDate {
     day: u8,
     month: Month,
@@ -228,10 +228,12 @@ impl TDate {
             year: d.year(),
         }
     }
+}
 
-    /// Formats the date in a way that is usable by the underlying API (yymmdd).
-    fn format(&self) -> String {
-        format!(
+impl Display for TDate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
             "{}{}{}",
             self.year % 100,
             format!("{:0>2}", self.month as u8),
@@ -241,7 +243,7 @@ impl TDate {
 }
 
 /// A collection of unique [`TDates`](TDate).
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DateRange {
     dates: HashSet<TDate>,
 }
@@ -313,7 +315,7 @@ impl TRequestBuilder {
         // TODO - Support multiple ressorts
         let mut url = Url::parse(BASE_URL)?;
 
-        url.query_pairs_mut().append_pair("date", &date.format());
+        url.query_pairs_mut().append_pair("date", &date.to_string());
 
         if !self.regions.is_empty() {
             let mut r = String::new();
@@ -374,12 +376,12 @@ impl TRequestBuilder {
 
         content.sort_by(|element, next| {
             let date_element = match element {
-                Content::Text(t) => t.date,
+                Content::TextArticle(t) => t.date,
                 Content::Video(v) => v.date,
             };
 
             let date_next = match next {
-                Content::Text(t) => t.date,
+                Content::TextArticle(t) => t.date,
                 Content::Video(v) => v.date,
             };
 
@@ -395,14 +397,14 @@ impl TRequestBuilder {
         Ok(content)
     }
 
-    /// Query only [`Text`] articles that match the parameters currently specified on the `TRequestBuilder` Object.
-    pub async fn get_text_articles(&self) -> Result<Vec<Text>, Error> {
+    /// Query only [`TextArticle`] articles that match the parameters currently specified on the `TRequestBuilder` Object.
+    pub async fn get_text_articles(&self) -> Result<Vec<TextArticle>, Error> {
         let articles = self.get_all_articles().await;
 
         match articles {
             Ok(mut a) => {
                 a.retain(|x| x.is_text());
-                let mut t: Vec<Text> = Vec::new();
+                let mut t: Vec<TextArticle> = Vec::new();
 
                 for content in a {
                     t.push(content.to_text().unwrap())
@@ -444,22 +446,16 @@ struct Articles {
 #[serde(untagged)]
 pub enum Content {
     #[allow(missing_docs)]
-    Text(Text),
+    TextArticle(TextArticle),
     #[allow(missing_docs)]
     Video(Video),
 }
 
-impl PartialEq for Content {
-    fn eq(&self, other: &Self) -> bool {
-        std::mem::discriminant(self) == std::mem::discriminant(other)
-    }
-}
-
 impl Content {
-    /// Checks if the `Content` is a [`Text`].
+    /// Checks if the `Content` is a [`TextArticle`].
     pub fn is_text(&self) -> bool {
         match self {
-            Content::Text(_) => true,
+            Content::TextArticle(_) => true,
             Content::Video(_) => false,
         }
     }
@@ -467,15 +463,15 @@ impl Content {
     /// Checks if the `Content` is a [`Video`].
     pub fn is_video(&self) -> bool {
         match self {
-            Content::Text(_) => false,
+            Content::TextArticle(_) => false,
             Content::Video(_) => true,
         }
     }
 
-    /// Unpacks a and returns a [`Text`].
-    pub fn to_text(self) -> Result<Text, Error> {
+    /// Unpacks a and returns a [`TextArticle`].
+    pub fn to_text(self) -> Result<TextArticle, Error> {
         match self {
-            Content::Text(text) => Ok(text),
+            Content::TextArticle(text) => Ok(text),
             Content::Video(_) => Err(Error::ConversionError),
         }
     }
@@ -484,149 +480,245 @@ impl Content {
     pub fn to_video(self) -> Result<Video, Error> {
         match self {
             Content::Video(video) => Ok(video),
-            Content::Text(_) => Err(Error::ConversionError),
+            Content::TextArticle(_) => Err(Error::ConversionError),
         }
     }
 }
 
 /// A text article returned by the API.
 #[derive(Deserialize, Debug)]
-pub struct Text {
-    #[allow(missing_docs)]
-    pub title: String,
-    #[allow(missing_docs)]
+pub struct TextArticle {
+    title: String,
     #[serde(with = "rfc3339")]
-    pub date: OffsetDateTime,
-    #[allow(missing_docs)]
+    date: OffsetDateTime,
     #[serde(rename(deserialize = "detailsweb"))]
-    pub url: String,
-    #[allow(missing_docs)]
-    #[serde(default = "default_tag_vec")]
-    pub tags: Vec<Tag>,
-    #[allow(missing_docs)]
-    #[serde(default = "default_ressort")]
-    pub ressort: Ressort,
-    #[allow(missing_docs)]
+    url: String,
+    tags: Option<Vec<Tag>>,
+    ressort: Option<Ressort>,
     #[serde(rename(deserialize = "type"))]
-    pub kind: String,
-    #[allow(missing_docs)]
-    #[serde(rename(deserialize = "breakingNews"), default = "default_bool")]
-    pub breaking_news: bool,
-    #[allow(missing_docs)]
-    #[serde(rename(deserialize = "teaserImage"), default = "default_images")]
-    pub image: Image,
+    kind: String,
+    #[serde(rename(deserialize = "breakingNews"))]
+    breaking_news: Option<bool>,
+    #[serde(rename(deserialize = "teaserImage"))]
+    image: Option<Image>,
+}
+
+impl TextArticle {
+    /// Get the title of this `TextArticle`.
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    /// Get the publishing time of this `TextArticle` as [OffsetDateTime].
+    pub fn date(&self) -> OffsetDateTime {
+        self.date
+    }
+
+    /// Get the URL to this `TextArticle`.
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    /// Get the tags of this `TextArticle`.
+    pub fn tags(&self) -> Option<Vec<&str>> {
+        match &self.tags {
+            Some(t) => {
+                let mut tags: Vec<&str> = Vec::new();
+                for tag in t {
+                    tags.push(&tag.tag)
+                }
+                Some(tags)
+            }
+            None => None,
+        }
+    }
+
+    /// Get the [`Ressort`] of this `TextArticle`.
+    pub fn ressort(&self) -> Option<Ressort> {
+        self.ressort
+    }
+
+    /// Get the type of `TextArticle` this is.
+    pub fn kind(&self) -> &str {
+        &self.kind
+    }
+
+    /// Get if this `TextArticle` is breaking news or not.
+    pub fn breaking_news(&self) -> Option<bool> {
+        self.breaking_news
+    }
+
+    /// Get the image attached to this `TextArticle`.
+    pub fn image(&self) -> Option<&Image> {
+        self.image.as_ref()
+    }
 }
 
 /// A video returned by the API.
 #[derive(Deserialize, Debug)]
 pub struct Video {
-    #[allow(missing_docs)]
-    pub title: String,
-    #[allow(missing_docs)]
+    title: String,
     #[serde(with = "rfc3339")]
-    pub date: OffsetDateTime,
-    #[allow(missing_docs)]
-    /// A [`HashMap`] consisting of (stream type, URL) (key, value) pairs.
-    pub streams: HashMap<String, String>,
-    #[allow(missing_docs)]
-    #[serde(default = "default_tag_vec")]
-    pub tags: Vec<Tag>,
-    #[allow(missing_docs)]
-    #[serde(default = "default_string")]
-    pub ressort: String,
-    #[allow(missing_docs)]
+    date: OffsetDateTime,
+    streams: HashMap<String, String>,
+    tags: Option<Vec<Tag>>,
+    ressort: Option<Ressort>,
     #[serde(rename(deserialize = "type"))]
-    pub kind: String,
-    #[allow(missing_docs)]
-    #[serde(rename(deserialize = "breakingNews"), default = "default_bool")]
-    pub breaking_news: bool,
-    #[allow(missing_docs)]
-    #[serde(rename(deserialize = "teaserImage"), default = "default_images")]
-    pub image: Image,
+    kind: String,
+    #[serde(rename(deserialize = "breakingNews"))]
+    breaking_news: Option<bool>,
+    #[serde(rename(deserialize = "teaserImage"))]
+    image: Option<Image>,
 }
 
-/// A tag value for a [`Text`] or a [`Video`].
-#[derive(Deserialize, Debug)]
-pub struct Tag {
-    #[allow(missing_docs)]
-    pub tag: String,
-}
+impl Video {
+    /// Get the title of this `Video`.
+    pub fn title(&self) -> &str {
+        &self.title
+    }
 
-/// A struct that contains an images metadata and variants.
-#[derive(Deserialize, Debug)]
-pub struct Image {
-    #[allow(missing_docs)]
-    #[serde(default = "default_string")]
-    pub title: String,
-    #[serde(default = "default_string")]
-    #[allow(missing_docs)]
-    pub copyright: String,
-    #[serde(default = "default_string")]
-    #[allow(missing_docs)]
-    pub alttext: String,
-    /// A [`HashMap`] consisting of (image size, URL) (key, value) pairs
-    #[serde(rename(deserialize = "imageVariants"), default = "default_hash_map")]
-    pub image_variants: HashMap<String, String>,
-    #[allow(missing_docs)]
-    #[serde(rename(deserialize = "type"))]
-    pub kind: String,
-}
+    /// Get the publishing time of this `Video` as [OffsetDateTime].
+    pub fn date(&self) -> OffsetDateTime {
+        self.date
+    }
 
-fn default_string() -> String {
-    "".to_string()
-}
+    /// Get the [`HashMap`] consisting of (stream-type, URL) (key, value) pairs of this `Video`.
+    pub fn streams(&self) -> HashMap<&str, &str> {
+        let mut streams: HashMap<&str, &str> = HashMap::new();
+        for (key, value) in &self.streams {
+            streams.insert(&key, &value);
+        }
+        streams
+    }
 
-fn default_hash_map() -> HashMap<String, String> {
-    HashMap::new()
-}
+    /// Get the tags of this `Video`.
+    pub fn tags(&self) -> Option<Vec<&str>> {
+        match &self.tags {
+            Some(t) => {
+                let mut tags: Vec<&str> = Vec::new();
+                for tag in t {
+                    tags.push(&tag.tag)
+                }
+                Some(tags)
+            }
+            None => None,
+        }
+    }
 
-fn default_tag_vec() -> Vec<Tag> {
-    Vec::new()
-}
+    /// Get the [`Ressort`] of this `Video`.
+    pub fn ressort(&self) -> Option<Ressort> {
+        self.ressort
+    }
 
-fn default_bool() -> bool {
-    false
-}
+    /// Get the type of `Video` this is.
+    pub fn kind(&self) -> &str {
+        &self.kind
+    }
 
-fn default_images() -> Image {
-    Image {
-        title: "".to_string(),
-        copyright: "".to_string(),
-        alttext: "".to_string(),
-        image_variants: HashMap::new(),
-        kind: "".to_string(),
+    /// Get if this `Video` is breaking news or not.
+    pub fn breaking_news(&self) -> Option<bool> {
+        self.breaking_news
+    }
+
+    /// Get the image attached to this `Video`.
+    pub fn image(&self) -> Option<&Image> {
+        match &self.image {
+            Some(img) => match &img.image_variants {
+                Some(variants) => {
+                    let var = if variants.is_empty() { None } else { Some(img) };
+                    var
+                }
+                None => None,
+            },
+            None => None,
+        };
+        self.image.as_ref()
     }
 }
 
-fn default_ressort() -> Ressort {
-    Ressort::None
+#[derive(Deserialize, Debug)]
+struct Tag {
+    tag: String,
 }
 
-/// The Errors that might occur when using the API
+/// A struct that contains an images metadata and variants.
+#[derive(Deserialize, Debug, Clone)]
+pub struct Image {
+    title: Option<String>,
+    copyright: Option<String>,
+    alttext: Option<String>,
+    #[serde(rename(deserialize = "imageVariants"))]
+    image_variants: Option<HashMap<String, String>>,
+    #[serde(rename(deserialize = "type"))]
+    kind: String,
+}
+
+impl Image {
+    /// Get the title of this `Image`.
+    pub fn title(&self) -> Option<&str> {
+        match &self.title {
+            Some(title) => Some(&title),
+            None => None,
+        }
+    }
+
+    /// Get the copyright of this `Image`.
+    pub fn copyright(&self) -> Option<&str> {
+        match &self.copyright {
+            Some(copyright) => Some(&copyright),
+            None => None,
+        }
+    }
+
+    /// Get the alt-text of this `Image`.
+    pub fn alttext(&self) -> Option<&str> {
+        match &self.alttext {
+            Some(alttext) => Some(&alttext),
+            None => None,
+        }
+    }
+
+    /// Get the [`HashMap`] consisting of (image-resolution, URL) (key, value) pairs of this `Image`.
+    pub fn image_variants(&self) -> HashMap<&str, &str> {
+        let variants = self.image_variants.as_ref().unwrap();
+        let mut image_variants: HashMap<&str, &str> = HashMap::new();
+        for (key, value) in variants {
+            image_variants.insert(&key, &value);
+        }
+        image_variants
+    }
+
+    /// Get the type of `Image` this is.
+    pub fn kind(&self) -> &str {
+        &self.kind
+    }
+}
+
+/// The Errors that might occur when using the API.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[allow(missing_docs)]
+    /// Fetching articles failed.
     #[error("Fetching articles failed")]
     BadRequest(reqwest::Error),
-    #[allow(missing_docs)]
+    /// Failed to parse http response.
     #[error("Failed to parse response")]
     ParsingError(reqwest::Error),
-    #[allow(missing_docs)]
+    /// Invalid HTTP Response, contains HTTP response code.
     #[error("Invalid Response: HTTP Response Code {0}")]
     InvalidResponse(u16),
-    #[allow(missing_docs)]
+    /// Failed to deserialize response.
     #[error("Failed to deserialize response")]
     DeserializationError(#[from] serde_json::Error),
-    #[allow(missing_docs)]
+    /// Tried to extract wrong type from [Content].
     #[error("Tried to extract wrong type")]
     ConversionError,
-    #[allow(missing_docs)]
+    /// Unable to retrieve current date.
     #[error("Unable to retrieve current date")]
     DateError(#[from] time::error::IndeterminateOffset),
-    #[allow(missing_docs)]
+    /// Unable parse date.
     #[error("Unable parse date")]
     DateParsingError(#[from] time::error::ComponentRange),
-    #[allow(missing_docs)]
-    #[error("Url parsing failed")]
+    /// URL parsing failed.
+    #[error("URL parsing failed")]
     UrlParsing(#[from] url::ParseError),
 }
