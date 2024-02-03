@@ -6,7 +6,7 @@ use reqwest;
 use reqwest::StatusCode;
 use serde::{
     de::{self, Visitor},
-    Deserialize,
+    Deserialize, Deserializer,
 };
 use std::{
     cmp::Ordering,
@@ -122,35 +122,6 @@ impl Month {
     }
 }
 
-struct RessortVisitor;
-
-impl<'de> Visitor<'de> for RessortVisitor {
-    type Value = Ressort;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a string with one of the following values: inland, ausland, wirtschaft, sport, video, investigativ")
-    }
-
-    fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
-    where
-        E: de::Error,
-    {
-        match value.as_str() {
-            "" => Ok(Ressort::None),
-            "inland" => Ok(Ressort::Inland),
-            "ausland" => Ok(Ressort::Ausland),
-            "wirtschaft" => Ok(Ressort::Wirtschaft),
-            "sport" => Ok(Ressort::Sport),
-            "video" => Ok(Ressort::Video),
-            "investigativ" => Ok(Ressort::Investigativ),
-            _ => Err(E::custom(format!(
-                "String does not contain expected value: {}",
-                value
-            ))),
-        }
-    }
-}
-
 /// The different available news categorys
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone)]
 pub enum Ressort {
@@ -189,9 +160,22 @@ impl Display for Ressort {
 impl<'de> Deserialize<'de> for Ressort {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>,
+        D: Deserializer<'de>,
     {
-        deserializer.deserialize_str(RessortVisitor)
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
+            "" => Ok(Ressort::None),
+            "inland" => Ok(Ressort::Inland),
+            "ausland" => Ok(Ressort::Ausland),
+            "wirtschaft" => Ok(Ressort::Wirtschaft),
+            "sport" => Ok(Ressort::Sport),
+            "video" => Ok(Ressort::Video),
+            "investigativ" => Ok(Ressort::Investigativ),
+            _ => Err(de::Error::custom(format!(
+                "String does not contain expected value: {}",
+                s
+            ))),
+        }
     }
 }
 
