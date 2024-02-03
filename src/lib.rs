@@ -4,10 +4,7 @@
 use reqwest;
 
 use reqwest::StatusCode;
-use serde::{
-    de::{self, Visitor},
-    Deserialize, Deserializer,
-};
+use serde::{de, Deserialize, Deserializer};
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},

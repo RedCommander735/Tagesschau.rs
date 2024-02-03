@@ -1,6 +1,5 @@
 # tagesschau-rs
 
-<!-- [![Build Status]()]() -->
 [![Crates.io](https://img.shields.io/crates/v/tagesschau)](https://crates.io/crates/tagesschau)
 [![Documentation](https://img.shields.io/docsrs/tagesschau)](https://docs.rs/tagesschau/)
 [![License: MIT](https://img.shields.io/crates/l/tagesschau)](LICENSE)
@@ -32,7 +31,7 @@ for article in articles {
 ```
 <details><summary>Results in something like</summary>
 
-```rust
+```
 Gesetzlicher Mindestlohn zeigt positive Wirkung - 14:52:03.304
 E-Autos werden beliebter – nur nicht in Deutschland - 17:07:02.836
 Fed lässt Leitzins erneut unverändert - 20:50:58.427
