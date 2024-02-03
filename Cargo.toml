@@ -1,6 +1,6 @@
 [package]
 name = "tagesschau"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 license = "MIT"
 description = "This crate provides an easy to use wrapper for german news provider Tagesschau"
