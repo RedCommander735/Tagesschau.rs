@@ -348,7 +348,7 @@ impl TRequestBuilder {
         Ok(articles)
     }
 
-    /// Query all articles that match the parameters currently specified on the `TRequestBuilder` Object.
+    /// Query all articles that match the parameters currently specified on the `TRequestBuilder` Object in form of [Content].
     pub async fn get_all_articles(&self) -> Result<Vec<Content>, Error> {
         let dates: Vec<TDate> = match &self.timeframe {
             Timeframe::Now => {
