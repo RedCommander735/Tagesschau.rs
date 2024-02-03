@@ -338,6 +338,8 @@ impl TRequestBuilder {
     async fn fetch(&self, date: TDate) -> Result<Articles, Error> {
         let url = self.prepare_url(date)?;
 
+        println!("{}", url);
+
         let response = reqwest::get(url).await.map_err(|e| Error::BadRequest(e))?;
 
         let text = match response.status() {
