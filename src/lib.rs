@@ -139,6 +139,8 @@ pub enum Ressort {
     Video,
     /// Investigative journalism.
     Investigativ,
+    /// Informative news that refutes false reports, explain the background and encourage reflection.
+    Wissen,
 }
 
 impl Display for Ressort {
@@ -152,7 +154,7 @@ impl Display for Ressort {
             Ressort::Sport => f.write_str("sport"),
             Ressort::Video => f.write_str("video"),
             Ressort::Investigativ => f.write_str("investigativ"),
-            // Ressort::Faktenfinder => f.write_str("faktenfinder"),
+            Ressort::Wissen => f.write_str("wissen"),
         }
     }
 }
@@ -171,6 +173,7 @@ impl<'de> Deserialize<'de> for Ressort {
             "sport" => Ok(Ressort::Sport),
             "video" => Ok(Ressort::Video),
             "investigativ" => Ok(Ressort::Investigativ),
+            "wissen" => Ok(Ressort::Wissen),
             _ => Err(de::Error::custom(format!(
                 "String does not contain expected value: {}",
                 s

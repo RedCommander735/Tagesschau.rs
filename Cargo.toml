@@ -1,6 +1,6 @@
 [package]
 name = "tagesschau"
-version = "0.2.5"
+version = "0.2.6"
 edition = "2021"
 license = "MIT"
 description = "A client library for interacting with the Tagesschau's `/api2/news` endpoint."
