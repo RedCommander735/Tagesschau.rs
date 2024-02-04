@@ -52,3 +52,4 @@ See [LICENSE](LICENSE) for more information.
 - [ ] Support for multiple ressorts
 - [ ] Support for Datetime timeframes (limit to 12.00h to 13.00h e.g.)
 - [ ] Support for a limited amount of articles
+- [ ] Add support for blocking requests

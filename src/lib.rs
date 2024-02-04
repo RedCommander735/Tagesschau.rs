@@ -1,4 +1,7 @@
 #![warn(missing_docs)]
+// only enables the `doc_cfg` feature when
+// the `docsrs` configuration attribute is defined
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
 
 use reqwest;
@@ -416,6 +419,10 @@ impl TRequestBuilder {
         }
     }
 }
+
+#[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
+#[cfg(feature = "blocking")]
+mod blocking;
 
 #[derive(Deserialize, Debug)]
 struct Articles {
