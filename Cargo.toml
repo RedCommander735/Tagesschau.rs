@@ -5,7 +5,6 @@ edition = "2021"
 license = "MIT"
 description = "A client library for interacting with the Tagesschau's `/api2/news` endpoint."
 repository = "https://github.com/RedCommander735/Tagesschau.rs"
-homepage = "https://github.com/RedCommander735"
 readme = "README.md"
 categories = ["api-bindings"]
 keywords = ["tagesschau", "news", "ard", "zdf", "async"]
